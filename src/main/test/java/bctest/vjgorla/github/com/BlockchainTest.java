@@ -3,6 +3,8 @@ package bctest.vjgorla.github.com;
 import java.math.BigInteger;
 import java.util.List;
 
+import org.junit.Test;
+
 import bctest.vjgorla.github.com.Blockchain.Block;
 import junit.framework.TestCase;
 
@@ -14,6 +16,7 @@ public class BlockchainTest extends TestCase {
         blockchain = new Blockchain();
     }
     
+    @Test
     public void testIntialState() {
         assertEquals(blockchain.topBlockHash, Blockchain.ROOT_HASH);
         assertEquals(blockchain.topBlockNumber.intValue(), 0);
