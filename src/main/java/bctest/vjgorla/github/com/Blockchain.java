@@ -14,6 +14,7 @@ public class Blockchain {
     public static final int RETARGET_BLOCK_INTERVAL = 100;
     public static final BigInteger INITIAL_DIFFICULTY = new BigInteger("2").pow(256).divide(new BigInteger("100000"));
     public static final BigInteger BASELINE_TS_INTERVAL = new BigInteger("1000000");
+    public static final BigInteger DIFFICULTY_PRECISION = new BigInteger("1000000");
 
     BigInteger currentDifficulty = INITIAL_DIFFICULTY;
     int retargetBlockInterval = RETARGET_BLOCK_INTERVAL;
@@ -131,8 +132,8 @@ public class Blockchain {
         BigInteger newDifficulty = this._calculateDifficulty(block.blockHash);
         if (newDifficulty.compareTo(this.currentDifficulty) != 0) {
             BigDecimal diff = new BigDecimal(currentDifficulty.subtract(newDifficulty).multiply(new BigInteger("100")))
-                .divide(new BigDecimal(currentDifficulty), 2, RoundingMode.HALF_UP);
-            System.out.println("Difficulty " + diff + "% ... " + this.currentDifficulty.toString() + " > " + newDifficulty.toString());
+                .divide(new BigDecimal(currentDifficulty), 2, RoundingMode.HALF_UP).negate();
+            System.out.println("Difficulty " + diff + "% ... " + _difficultyToString(this.currentDifficulty) + " > " + _difficultyToString(newDifficulty));
         }
         this.currentDifficulty = newDifficulty;
     }
@@ -152,7 +153,7 @@ public class Blockchain {
             }
             if (height == toHeight) {
                 long interval = fromTs - block.ts;
-                return _difficulty(interval);
+                return _difficulty(interval, this._calculateDifficulty(block.blockHash));
             }
             hash = block.prevBlockHash;
             height--;
@@ -218,8 +219,12 @@ public class Blockchain {
         return this.map.get(block.prevBlockHash);
     }
     
-    private static BigInteger _difficulty(long interval) {
-        return new BigInteger("2").pow(256).multiply(new BigInteger(Long.toString(interval)).multiply(new BigInteger("100000")).divide(BASELINE_TS_INTERVAL)).divide(new BigInteger("10000000000"));
+    private static BigInteger _difficulty(long interval, BigInteger prevDifficulty) {
+        return new BigInteger(Long.toString(interval)).multiply(DIFFICULTY_PRECISION).divide(BASELINE_TS_INTERVAL).multiply(prevDifficulty).divide(DIFFICULTY_PRECISION);
+    }
+    
+    private static String _difficultyToString(BigInteger diffculty) {
+        return new BigInteger("2").pow(256).divide(diffculty).toString();
     }
 
     public static void main(String[] args)
