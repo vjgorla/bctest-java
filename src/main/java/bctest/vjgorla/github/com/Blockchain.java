@@ -131,9 +131,11 @@ public class Blockchain {
     private void _setDifficulty(Block block) {
         BigInteger newDifficulty = this._calculateDifficulty(block.blockHash);
         if (newDifficulty.compareTo(this.currentDifficulty) != 0) {
-            BigDecimal diff = new BigDecimal(currentDifficulty.subtract(newDifficulty).multiply(new BigInteger("100")))
-                .divide(new BigDecimal(currentDifficulty), 2, RoundingMode.HALF_UP).negate();
-            System.out.println("Difficulty " + diff + "% ... " + _difficultyToString(this.currentDifficulty) + " > " + _difficultyToString(newDifficulty));
+            BigInteger oldD = _difficultyToDisplay(currentDifficulty);
+            BigInteger newD = _difficultyToDisplay(newDifficulty);
+            BigDecimal diff = new BigDecimal(newD.subtract(oldD).multiply(new BigInteger("100")))
+                .divide(new BigDecimal(oldD), 2, RoundingMode.HALF_UP);
+            System.out.println("Difficulty " + diff + "% ... " + oldD.toString() + " > " + newD.toString());
         }
         this.currentDifficulty = newDifficulty;
     }
@@ -223,8 +225,8 @@ public class Blockchain {
         return new BigInteger(Long.toString(interval)).multiply(DIFFICULTY_PRECISION).divide(BASELINE_TS_INTERVAL).multiply(prevDifficulty).divide(DIFFICULTY_PRECISION);
     }
     
-    private static String _difficultyToString(BigInteger diffculty) {
-        return new BigInteger("2").pow(256).divide(diffculty).toString();
+    private static BigInteger _difficultyToDisplay (BigInteger diffculty) {
+        return new BigInteger("2").pow(256).divide(diffculty);
     }
 
     public static void main(String[] args)
