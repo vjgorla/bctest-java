@@ -33,12 +33,12 @@ public class RetargetTest extends TestCase {
         assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.multiply(new BigInteger("2")));
         blockchain.addBlock(createBlock("d", "c", 2000010), true);
         blockchain.addBlock(createBlock("e", "d", 3000000), true);
-        assertEquals(blockchain._calculateDifficulty("e"), INITIAL_DIFFICULTY);
-        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY);
+        assertEquals(blockchain._calculateDifficulty("e"), INITIAL_DIFFICULTY.multiply(new BigInteger("2")));
+        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.multiply(new BigInteger("2")));
         blockchain.addBlock(createBlock("f", "e", 3000010), true);
         blockchain.addBlock(createBlock("g", "f", 3000010), true);
-        assertEquals(blockchain._calculateDifficulty("g"), INITIAL_DIFFICULTY.divide(new BigInteger("100000")));
-        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.divide(new BigInteger("100000")));
+        assertEquals(blockchain._calculateDifficulty("g"), INITIAL_DIFFICULTY.divide(new BigInteger("50000")));
+        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.divide(new BigInteger("50000")));
     }
     
     public void testRetargetOtherBranches() {
@@ -97,7 +97,7 @@ public class RetargetTest extends TestCase {
         result = blockchain.addBlock(block, false);
         assertEquals(result.valid, true);
 
-        assertEquals(blockchain._calculateDifficulty("00002007422630a845f547083b9bad6ffd06bb4653cfc575f0f6bbf7038bf4bc"), INITIAL_DIFFICULTY.divide(new BigInteger("4")));
+        assertEquals(blockchain._calculateDifficulty("00002007422630a845f547083b9bad6ffd06bb4653cfc575f0f6bbf7038bf4bc"), INITIAL_DIFFICULTY.divide(new BigInteger("8")));
         assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY);
         assertEquals(blockchain.topBlockHash, "e");
 
@@ -112,7 +112,7 @@ public class RetargetTest extends TestCase {
         result = blockchain.addBlock(block, false);
         assertEquals(result.valid, true);
 
-        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.divide(new BigInteger("4")));
+        assertEquals(blockchain.currentDifficulty, INITIAL_DIFFICULTY.divide(new BigInteger("8")));
         assertEquals(blockchain.topBlockHash, "000005cdad940869376620dd4174419cb50ff6b342494ed59a7f45c5648f58b5");
     }
 
