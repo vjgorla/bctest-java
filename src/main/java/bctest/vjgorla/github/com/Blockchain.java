@@ -228,9 +228,4 @@ public class Blockchain {
     private static BigInteger _difficultyToDisplay (BigInteger diffculty) {
         return new BigInteger("2").pow(256).divide(diffculty);
     }
-
-    public static void main(String[] args)
-    {
-        System.out.println(INITIAL_DIFFICULTY.toString());
-    }
 }
