@@ -10,8 +10,14 @@ public class BlockchainTest extends TestCase {
 
     private Blockchain blockchain;
     
+    @Override
     protected void setUp() {
-        blockchain = new Blockchain();
+        blockchain = new Blockchain("jdbc:h2:mem:blockchain");
+    }
+    
+    @Override
+    protected void tearDown() {
+        blockchain.close();
     }
     
     public void testIntialState() {
