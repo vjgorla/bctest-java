@@ -11,9 +11,15 @@ public class RetargetTest extends TestCase {
 
     private Blockchain blockchain;
     
+    @Override
     protected void setUp() {
-        blockchain = new Blockchain();
+        blockchain = new Blockchain("jdbc:h2:mem:blockchain");
         blockchain.retargetBlockInterval = 2;
+    }
+    
+    @Override
+    protected void tearDown() {
+        blockchain.close();
     }
     
     public void testInitialDifficulty() {

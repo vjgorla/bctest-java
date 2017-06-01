@@ -61,7 +61,9 @@ public class HttpUtils {
                 String responseStr = EntityUtils.toString(entity);
                 if (responseStr != null) {
                     for (String blockStr : responseStr.split("\\r?\\n")) {
-                        handler.apply(blockStr);
+                        if (blockStr != null && !blockStr.trim().equals("")) {
+                            handler.apply(blockStr);
+                        }
                     }
                 }
                 response.close();

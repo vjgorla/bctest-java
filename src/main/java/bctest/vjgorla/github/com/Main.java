@@ -21,7 +21,7 @@ import bctest.vjgorla.github.com.Blockchain.Block;
 @SuppressWarnings("restriction")
 public class Main {
     
-    private final Blockchain blockchain = new Blockchain();
+    private Blockchain blockchain;
     
     private String hostname;
     
@@ -154,9 +154,10 @@ public class Main {
     }
 
     private void start() throws InterruptedException, IOException {
+        blockchain = new Blockchain("jdbc:h2:./" + text);
         if (!peers.isEmpty()) {
             HttpUtils.addPeer(peers, hostname, port);
-            HttpUtils.getBlocks(peers.get(0), Blockchain.ROOT_HASH, new Function<String, Void>() {
+            HttpUtils.getBlocks(peers.get(0), blockchain.topBlockHash, new Function<String, Void>() {
                 @Override
                 public Void apply(String blockStr) {
                     processBlock(blockStr, null, null);
