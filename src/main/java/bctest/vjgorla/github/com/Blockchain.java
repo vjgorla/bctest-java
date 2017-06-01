@@ -3,10 +3,9 @@ package bctest.vjgorla.github.com;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import bctest.vjgorla.github.com.Database.Meta;
 
 public class Blockchain {
 
@@ -20,8 +19,8 @@ public class Blockchain {
     int retargetBlockInterval = RETARGET_BLOCK_INTERVAL;
     BigInteger topBlockNumber = BigInteger.ZERO;
     String topBlockHash = ROOT_HASH;
-    Map<String, Block> map = new HashMap<>();
-    Map<String, List<Block>> descendantsMap = new HashMap<>();
+    
+    private Database db;
     
     public static class Block {
         public Block(String prevBlockHash, BigInteger nonce, long ts, String text) {
@@ -35,6 +34,8 @@ public class Blockchain {
         BigInteger nonce;
         long ts;
         String text;
+        BigInteger blockNumber;
+        BigInteger nextBlockDifficulty;
         public String blockContentsString() {
             return this.prevBlockHash + ":" + this.nonce.toString() + ":" + this.ts + ":" + this.text;
         }
@@ -68,13 +69,36 @@ public class Blockchain {
         }
     }
 
+    public Blockchain(String dbUrl) {
+        db = new Database(dbUrl);
+        Meta meta = db.readBlockchain();
+        if (meta == null) {
+            db.initBlockchain(this.currentDifficulty, this.topBlockNumber, this.topBlockHash);
+        } else {
+            this.currentDifficulty = meta.currentDifficulty;
+            this.topBlockNumber = meta.topBlockNumber;
+            this.topBlockHash = meta.topBlockHash;
+        }
+    }
+    
+    public void close() {
+        this.db.shutdown();
+    }
+    
     public synchronized AddBlockResult addBlock(Block block, boolean mined) {
-        if (this.map.containsKey(block.blockHash)) {
+        if (this.db.getBlock(block.blockHash) != null) {
             return AddBlockResult.create().alreadyExists();
         }
-        if (!block.prevBlockHash.equals(ROOT_HASH) && !this.map.containsKey(block.prevBlockHash)) {
-            System.out.println("Orphan - " + block.prevBlockHash + " does not exist");
-            return AddBlockResult.create().orphan();
+        Block prevBlock = null;
+        if (block.prevBlockHash.equals(ROOT_HASH)) {
+            block.blockNumber = BigInteger.ONE;
+        } else {
+            prevBlock = this.db.getBlock(block.prevBlockHash);
+            if (prevBlock == null) {
+                System.out.println("Orphan - " + block.prevBlockHash + " does not exist");
+                return AddBlockResult.create().orphan();
+            }
+            block.blockNumber = prevBlock.blockNumber.add(BigInteger.ONE);
         }
         if (!mined) {
             String blockContentsStr = block.blockContentsString();
@@ -84,141 +108,87 @@ public class Blockchain {
                 return AddBlockResult.create().invalid();
             }
             BigInteger hashBigInt = Utils.hexToBigInt(block.blockHash);
-            BigInteger targetDifficulty = this._calculateDifficulty(block.prevBlockHash);
+            BigInteger targetDifficulty = prevBlock == null ? INITIAL_DIFFICULTY : prevBlock.nextBlockDifficulty;
             if (hashBigInt.compareTo(targetDifficulty) > 0) {
                 System.out.println("Invalid difficulty");
                 return AddBlockResult.create().invalid();
             }
         }
-        this.map.put(block.blockHash, block);
-        List<Block> descendants = this.descendantsMap.get(block.prevBlockHash);
-        if (descendants == null) {
-            descendants = new ArrayList<Block>();
-            this.descendantsMap.put(block.prevBlockHash, descendants);
-        }
-        descendants.add(block);
+        block.nextBlockDifficulty = this._calculateDifficulty(block, prevBlock);
+        db.insertBlock(block);
         if (block.prevBlockHash.equals(this.topBlockHash)) {
-            this.topBlockNumber = this.topBlockNumber.add(BigInteger.ONE);
+            this.topBlockNumber = block.blockNumber;
             System.out.println(this.topBlockNumber + (mined ? " > " : " < ") + block.blockString());
             this.topBlockHash = block.blockHash;
-            this._setDifficulty(block);
+            if (block.nextBlockDifficulty.compareTo(this.currentDifficulty) != 0) {
+                this.currentDifficulty = block.nextBlockDifficulty;
+            }
+            db.updateBlockchain(this.currentDifficulty, this.topBlockNumber, this.topBlockHash);
             return AddBlockResult.create().valid();
         } else {
-            String ihash = block.prevBlockHash;
-            int blockDepth = 0;
-            while(true) {
-                blockDepth++;
-                int distance = this._findDistance(ihash, this.topBlockHash, 0);
-                if (distance != -1) {
-                    if (blockDepth > distance) {
-                        this.topBlockNumber = this.topBlockNumber.subtract(new BigInteger(Integer.toString(distance))).add(new BigInteger(Integer.toString(blockDepth)));
-                        System.out.println("...(" + blockDepth + ") " + this.topBlockNumber + (mined ? " > " : " < ") + block.blockString());
-                        this.topBlockHash = block.blockHash;
-                        this._setDifficulty(block);
-                    } else {
-                        System.out.println((mined ? " > " : " < ") + block.blockString());
-                    }
-                    return AddBlockResult.create().valid();
+            if (block.blockNumber.compareTo(this.topBlockNumber) == 1) {
+                System.out.println("...(" + topBlockDistanceFromCommonAncestor(block.prevBlockHash) + ") " + block.blockNumber + (mined ? " > " : " < ") + block.blockString());
+                this.topBlockNumber = block.blockNumber;
+                this.topBlockHash = block.blockHash;
+                if (block.nextBlockDifficulty.compareTo(this.currentDifficulty) != 0) {
+                    this.currentDifficulty = block.nextBlockDifficulty;
                 }
-                if (ihash.equals(ROOT_HASH)) {
-                    throw new IllegalStateException("Traversing past root!!!");
-                }
-                ihash = this.map.get(ihash).prevBlockHash;
+                db.updateBlockchain(this.currentDifficulty, this.topBlockNumber, this.topBlockHash);
+            } else {
+                System.out.println((mined ? " > " : " < ") + block.blockString());
             }
+            return AddBlockResult.create().valid();
         }
     }
     
-    private void _setDifficulty(Block block) {
-        BigInteger newDifficulty = this._calculateDifficulty(block.blockHash);
-        if (newDifficulty.compareTo(this.currentDifficulty) != 0) {
-            BigInteger oldD = _difficultyToDisplay(currentDifficulty);
-            BigInteger newD = _difficultyToDisplay(newDifficulty);
-            BigDecimal diff = new BigDecimal(newD.subtract(oldD).multiply(new BigInteger("100")))
-                .divide(new BigDecimal(oldD), 2, RoundingMode.HALF_UP);
-            System.out.println("Difficulty " + diff + "% ... " + oldD.toString() + " > " + newD.toString());
+    private int topBlockDistanceFromCommonAncestor(String ihash) {
+        while(true) {
+            if (ihash.equals(ROOT_HASH)) {
+                return this.topBlockNumber.intValue();
+            }
+            int distance = this.db.getDistance(ihash, this.topBlockHash);
+            if (distance >= 0) {
+                return distance;
+            }
+            ihash = this.db.getBlock(ihash).prevBlockHash;
         }
-        this.currentDifficulty = newDifficulty;
     }
     
     BigInteger _calculateDifficulty(String hash) {
-        int height = this._calculateHeight(hash);
-        if (height <= this.retargetBlockInterval) {
+        Block block = this.db.getBlock(hash);
+        return _calculateDifficulty(block, this.db.getBlock(block.prevBlockHash));
+    }
+    
+    BigInteger _calculateDifficulty(Block block, Block prevBlock) {
+        if (prevBlock == null) {
             return INITIAL_DIFFICULTY;
         }
-        int fromHeight = height - ((height - 1) % this.retargetBlockInterval);
-        int toHeight = fromHeight - this.retargetBlockInterval;
-        long fromTs = 0;
-        while (true) {
-            Block block = this.map.get(hash);
-            if (height == fromHeight) {
-                fromTs = block.ts;
-            }
-            if (height == toHeight) {
-                long interval = fromTs - block.ts;
-                return _difficulty(interval, this._calculateDifficulty(block.blockHash));
-            }
-            hash = block.prevBlockHash;
-            height--;
+        int height = block.blockNumber.intValue();
+        if ((height - 1) % this.retargetBlockInterval > 0) {
+            return prevBlock.nextBlockDifficulty;
         }
-    }
-    
-    private int _calculateHeight(String hash) {
-        int height = 0;
-        while (!hash.equals(ROOT_HASH)) {
-            Block block = this.map.get(hash);
-            height++;
-            hash = block.prevBlockHash;
-        }
-        return height;
-    }
-    
-    private int _findDistance(String fromHash, String toHash, int currentDepth) {
-        if (fromHash.equals(toHash)) {
-            return currentDepth;
-        }
-        List<Block> descendants = this.descendantsMap.get(fromHash);
-        if (descendants == null) {
-            return -1;
-        }
-        currentDepth++;
-        for (int i = 0; i < descendants.size(); i++) {
-            if (descendants.get(i).blockHash.equals(toHash)) {
-                return currentDepth;
-            } else {
-                int distance = this._findDistance(descendants.get(i).blockHash, toHash, currentDepth);
-                if (distance != -1) {
-                    return distance;
-                }
-            }
-        }
-        return -1;
+        int toHeight = height - this.retargetBlockInterval;
+        Block toBlock = this.db.getAncestorAtHeight(block.prevBlockHash, toHeight);
+        long interval = block.ts - toBlock.ts;
+        BigInteger newDifficulty = _difficulty(interval, toBlock.nextBlockDifficulty);
+        BigInteger oldD = _difficultyToDisplay(toBlock.nextBlockDifficulty);
+        BigInteger newD = _difficultyToDisplay(newDifficulty);
+        BigDecimal diff = new BigDecimal(newD.subtract(oldD).multiply(new BigInteger("100")))
+                              .divide(new BigDecimal(oldD), 2, RoundingMode.HALF_UP);
+        System.out.println("Difficulty " + diff + "% ... " + oldD.toString() + " > " + newD.toString());
+        return newDifficulty;
     }
     
     public List<Block> getDescendants(String blockHash) {
-        List<Block> result = new ArrayList<>();
-        this._getDescendants(blockHash, result);
-        return result;
-    }
-    
-    private void _getDescendants(String blockHash, List<Block> result) {
-        List<Block> descendants = this.descendantsMap.get(blockHash);
-        if (descendants != null) {
-            for (int i = 0; i < descendants.size(); i++) {
-                int distance = this._findDistance(descendants.get(i).blockHash, this.topBlockHash, 0);
-                if (distance != -1) {
-                    result.add(descendants.get(i));
-                    this._getDescendants(descendants.get(i).blockHash, result);
-                }
-            }
-        }
+        return this.db.getDescendants(blockHash, topBlockHash);
     }
 
     public Block getAncestor(String descendantHash) {
-        Block block = this.map.get(descendantHash);
+        Block block = this.db.getBlock(descendantHash);
         if (block == null) {
             return null;
         }
-        return this.map.get(block.prevBlockHash);
+        return this.db.getBlock(block.prevBlockHash);
     }
     
     private static BigInteger _difficulty(long interval, BigInteger prevDifficulty) {
