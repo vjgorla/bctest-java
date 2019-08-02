@@ -10,7 +10,7 @@ Blocks are essentially empty, and there is no merkel tree or an in-built token. 
 ### How to run
 * Run ```bctest-java>mvnw clean install```
 * Start a node ```bctest-java>java -jar target\bctest-0.0.1-SNAPSHOT-jar-with-dependencies.jar -port 3001```
-* Start another node ```bctest>java -jar target\bctest-0.0.1-SNAPSHOT-jar-with-dependencies.jar -port 3002 -peer http:\\localhost:3001```
+* Start another node ```bctest>java -jar target\bctest-0.0.1-SNAPSHOT-jar-with-dependencies.jar -port 3002 -peer http://localhost:3001```
 
 To simulate latency in peer-to-peer network, block relay is delayed by 3secs by default. Increasing the delay by setting ```-delay``` (in milliseconds) will increase the probability of chain reorgs.
 
