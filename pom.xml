@@ -106,7 +106,7 @@
           <repository>
             <id>github</id>
             <name>GitHub OWNER Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/vjgorla/gremlin-ldap-plugin</url>
+            <url>https://maven.pkg.github.com/vjgorla/bctest-java</url>
           </repository>
         </distributionManagement>
 </project>
